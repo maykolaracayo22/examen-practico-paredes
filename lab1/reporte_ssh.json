@@ -1,0 +1,140 @@
+{
+    "resumen": {
+        "total_ips_atacantes": 35,
+        "total_intentos_fallidos": 253,
+        "umbral_alerta": 50
+    },
+    "top10_ips": [
+        {
+            "ip": "45.33.32.156",
+            "intentos": 120,
+            "usuarios_probados": [
+                "oracle",
+                "postgres",
+                "maria",
+                "carlos",
+                "root",
+                "www-data",
+                "backup",
+                "test",
+                "admin",
+                "user1",
+                "deploy",
+                "git",
+                "ubuntu",
+                "sysadmin",
+                "ftp"
+            ]
+        },
+        {
+            "ip": "193.32.162.55",
+            "intentos": 58,
+            "usuarios_probados": [
+                "oracle",
+                "postgres",
+                "maria",
+                "carlos",
+                "root",
+                "backup",
+                "test",
+                "git",
+                "user1",
+                "admin",
+                "deploy",
+                "ubuntu",
+                "sysadmin",
+                "ftp"
+            ]
+        },
+        {
+            "ip": "91.240.118.172",
+            "intentos": 30,
+            "usuarios_probados": [
+                "oracle",
+                "postgres",
+                "maria",
+                "carlos",
+                "root",
+                "www-data",
+                "backup",
+                "admin",
+                "test",
+                "user1",
+                "deploy",
+                "ubuntu",
+                "sysadmin",
+                "ftp"
+            ]
+        },
+        {
+            "ip": "172.16.0.70",
+            "intentos": 4,
+            "usuarios_probados": [
+                "backup",
+                "git",
+                "ftp"
+            ]
+        },
+        {
+            "ip": "192.168.1.90",
+            "intentos": 4,
+            "usuarios_probados": [
+                "test",
+                "maria",
+                "user1"
+            ]
+        },
+        {
+            "ip": "172.16.0.227",
+            "intentos": 3,
+            "usuarios_probados": [
+                "ubuntu",
+                "ftp",
+                "oracle"
+            ]
+        },
+        {
+            "ip": "172.16.0.76",
+            "intentos": 3,
+            "usuarios_probados": [
+                "backup",
+                "user1",
+                "www-data"
+            ]
+        },
+        {
+            "ip": "172.16.0.182",
+            "intentos": 2,
+            "usuarios_probados": [
+                "oracle",
+                "git"
+            ]
+        },
+        {
+            "ip": "10.0.222.18",
+            "intentos": 2,
+            "usuarios_probados": [
+                "oracle",
+                "postgres"
+            ]
+        },
+        {
+            "ip": "192.168.1.108",
+            "intentos": 2,
+            "usuarios_probados": [
+                "oracle",
+                "git"
+            ]
+        }
+    ],
+    "alertas": [
+        {
+            "ip": "193.32.162.55",
+            "intentos": 58
+        },
+        {
+            "ip": "45.33.32.156",
+            "intentos": 120
+        }
+    ]
+}
