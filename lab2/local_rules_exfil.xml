@@ -1,0 +1,36 @@
+<!-- Reglas personalizadas para detección de Exfiltración de Datos -->
+<group name="data_exfiltration,custom">
+
+  <!-- Regla base: tráfico saliente excesivo (>500MB) -->
+  <rule id="100010" level="10">
+    <if_sid>533</if_sid>
+    <match>bytes_sent</match>
+    <regex>bytes_sent=5[0-9]{8}|bytes_sent=[6-9][0-9]{8}|bytes_sent=[0-9]{9,}</regex>
+    <description>Tráfico de red saliente excesivo detectado (mayor a 500MB)</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+  </rule>
+
+  <!-- Regla base: login fuera de horario laboral (antes 8am o después 6pm) -->
+  <rule id="100011" level="8">
+    <if_sid>5501</if_sid>
+    <time>6 pm - 8 am</time>
+    <description>Login exitoso fuera del horario laboral</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <!-- Regla compuesta: tráfico masivo + login fuera de horario = exfiltración -->
+  <rule id="100012" level="14" frequency="2" timeframe="300">
+    <if_matched_sid>100010</if_matched_sid>
+    <if_matched_sid>100011</if_matched_sid>
+    <description>CRITICO: Posible exfiltración de datos - Tráfico masivo saliente con login fuera de horario</description>
+    <group>data_exfiltration,pci_dss_10.6.1,gdpr_IV_35.7.d</group>
+    <mitre>
+      <id>T1048.003</id>
+    </mitre>
+  </rule>
+
+</group>
