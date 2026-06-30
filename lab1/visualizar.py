@@ -1,9 +1,14 @@
 import json
+import re
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from collections import defaultdict
+
+PATRON_LOG = re.compile(
+    r'(\d+\.\d+\.\d+\.\d+) - - \[(.+?)\] "\S+ \S+ \S+" (\d+)'
+)
 
 def grafica_top10_ssh():
     with open("reporte_ssh.json") as f:
@@ -43,32 +48,51 @@ def grafica_timeline_http():
     print("[+] Guardada: graficas/timeline_http.png")
 
 def grafica_heatmap():
-    with open("reporte_web.json") as f:
-        data = json.load(f)
+    # Leer directamente del access.log para obtener hora y código real
+    codigos_interes = [200, 304, 400, 404, 500]
+    # hora (0-23) x codigo
+    matriz = defaultdict(lambda: defaultdict(int))
 
-    horas = [str(h).zfill(2) for h in range(24)]
-    codigos = [200, 304, 400, 404, 500]
-    matriz = np.zeros((len(codigos), len(horas)), dtype=int)
+    with open("access.log", "r") as f:
+        for linea in f:
+            m = PATRON_LOG.search(linea)
+            if not m:
+                continue
+            fecha_str = m.group(2)   # ej: 14/Jun/2024:03:13:44 +0000
+            codigo = int(m.group(3))
+            # Extraer hora: "14/Jun/2024:03:13:44" → hora = "03" → 3
+            try:
+                hora = int(fecha_str.split(":")[1])
+            except:
+                continue
+            if codigo in codigos_interes:
+                matriz[hora][codigo] += 1
 
-    # Reconstruir matriz desde top_ips_errores
-    for entrada in data["top_ips_errores"]:
-        for cod_str, cnt in entrada["detalle"].items():
-            cod = int(cod_str)
-            if cod in codigos:
-                fila = codigos.index(cod)
-                # Distribuir uniformemente entre horas (aproximación)
-                for h in range(24):
-                    matriz[fila][h] += cnt // 24
+    # Construir la matriz numpy ordenada
+    horas = list(range(24))
+    datos = np.zeros((len(codigos_interes), 24), dtype=int)
+    for h in horas:
+        for j, cod in enumerate(codigos_interes):
+            datos[j][h] = matriz[h][cod]
 
     fig, ax = plt.subplots(figsize=(16, 5))
-    im = ax.imshow(matriz, aspect="auto", cmap="YlOrRd")
+    im = ax.imshow(datos, aspect="auto", cmap="YlOrRd", interpolation="nearest")
     ax.set_xticks(range(24))
-    ax.set_xticklabels(horas)
-    ax.set_yticks(range(len(codigos)))
-    ax.set_yticklabels([str(c) for c in codigos])
+    ax.set_xticklabels([str(h).zfill(2) for h in range(24)])
+    ax.set_yticks(range(len(codigos_interes)))
+    ax.set_yticklabels([str(c) for c in codigos_interes])
     ax.set_xlabel("Hora del día")
     ax.set_ylabel("Código HTTP")
     ax.set_title("Heatmap de peticiones por hora y código HTTP")
+
+    # Añadir valores en cada celda
+    for i in range(len(codigos_interes)):
+        for j in range(24):
+            val = datos[i][j]
+            if val > 0:
+                ax.text(j, i, str(val), ha="center", va="center",
+                        fontsize=7, color="black")
+
     plt.colorbar(im, ax=ax, label="Número de peticiones")
     plt.tight_layout()
     plt.savefig("graficas/heatmap_http.png", dpi=150)
