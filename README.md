@@ -11,13 +11,12 @@
 
 | Campo | Detalle |
 |---|---|
-| Estudiante | Maykol Paredes |
+| Estudiante | Maykol Junior Paredes Aracayo |
 | Ciclo | IX |
 | Curso | Seguridad Informática |
 | Fecha | 30 de Junio de 2026 |
 | Modalidad | Laboratorio / Evaluación Práctica |
 | Duración | 4 horas |
-| Puntaje Total | 20 puntos |
 
 ---
 
