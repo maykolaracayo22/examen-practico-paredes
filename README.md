@@ -184,9 +184,7 @@ cd lab1/
 python3 analizar_ssh.py
 ```
 
-**Evidencia — Ejecución del script:**
 
-![SCR-1.4](lab1/evidencias/SCR-1.4_ejecucion_scripts.png)
 
 ---
 
@@ -522,17 +520,7 @@ Estado     : Enabled
 
 ---
 
-## Resumen de Resultados
 
-| Laboratorio | Descripción | Puntos | Estado |
-|---|---|---|---|
-| Lab 1 | Análisis Forense de Logs con Python | 5 pts | ✅ Completado |
-| Lab 2 | Reglas de Correlación en Wazuh | 4 pts | ✅ Completado |
-| Lab 3 | Modelo ML de Detección de Anomalías | 6 pts | ✅ Completado |
-| Lab 4 | Dashboard de Monitoreo SOC | 5 pts | ✅ Completado |
-| **Total** | | **20 pts** | ✅ **Completado** |
-
----
 
 *Universidad Peruana Unión — UPEU*  
 *Facultad de Ingeniería y Arquitectura*  
