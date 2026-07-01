@@ -1,9 +1,23 @@
 # Examen Práctico Final — Seguridad Informática
 ## Unidad IV: Monitoreo de Seguridad, SIEM e Inteligencia Artificial
 
-**Alumno:** Maykol Paredes  
-**Repositorio:** examen-practico-paredes  
-**Fecha:** Junio 2026  
+```
+╔══════════════════════════════════════════════════════════════════╗
+║         UNIVERSIDAD PERUANA UNIÓN — UPEU                        ║
+║         Facultad de Ingeniería y Arquitectura                   ║
+║         Escuela Profesional de Ingeniería de Sistemas           ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+| Campo | Detalle |
+|---|---|
+| Estudiante | Maykol Paredes |
+| Ciclo | IX |
+| Curso | Seguridad Informática |
+| Fecha | 30 de Junio de 2026 |
+| Modalidad | Laboratorio / Evaluación Práctica |
+| Duración | 4 horas |
+| Puntaje Total | 20 puntos |
 
 ---
 
@@ -12,12 +26,70 @@
 | Componente | Detalle |
 |---|---|
 | Sistema Operativo | Ubuntu Desktop 24.04 LTS |
-| Virtualización | VirtualBox (Windows 11 Host) |
+| Hipervisor | VirtualBox (VM local — Windows 11 Host) |
 | RAM asignada | 8 GB |
+| vCPU | 2 |
 | Python | 3.12 |
 | Wazuh Manager | 4.x |
-| Grafana | OSS (latest) |
-| Jupyter Notebook | 7.x |
+| Dashboard | Grafana OSS |
+| Jupyter | Notebook 7.x |
+| IP de la VM | 127.0.0.1 |
+
+### Instalación del entorno
+
+```bash
+# 1. Actualización del sistema
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl wget python3-pip python3-venv net-tools
+
+# 2. Configuración de Git
+git config --global user.name "maykolaracayo22"
+git config --global user.email "<tu-email>"
+
+# 3. Wazuh Manager
+curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | sudo gpg \
+  --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg \
+  --import && sudo chmod 644 /usr/share/keyrings/wazuh.gpg
+echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] \
+  https://packages.wazuh.com/4.x/apt/ stable main" | \
+  sudo tee /etc/apt/sources.list.d/wazuh.list
+sudo apt update && sudo apt install -y wazuh-manager
+sudo systemctl enable wazuh-manager && sudo systemctl start wazuh-manager
+
+# 4. Dependencias Python Lab 1
+pip3 install matplotlib --break-system-packages
+
+# 5. Dependencias Python Lab 3
+pip3 install jupyter notebook pandas numpy scikit-learn matplotlib seaborn \
+  --break-system-packages
+
+# 6. Grafana
+sudo apt install -y apt-transport-https software-properties-common
+wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
+echo "deb https://packages.grafana.com/oss/deb stable main" | \
+  sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt update && sudo apt install -y grafana
+sudo systemctl enable grafana-server && sudo systemctl start grafana-server
+sudo grafana-cli plugins install frser-sqlite-datasource
+sudo systemctl restart grafana-server
+```
+
+### Servicios activos
+
+```bash
+sudo systemctl status wazuh-manager   # active (running)
+sudo systemctl status grafana-server  # active (running)
+```
+
+### Acceso al Dashboard
+
+```
+Herramienta : Grafana OSS
+URL         : http://localhost:3000
+Usuario     : admin
+Datasource  : SQLite (frser-sqlite-datasource)
+DB Path     : /var/lib/grafana/wazuh_alerts.db
+```
 
 ---
 
@@ -27,11 +99,11 @@
 examen-practico-paredes/
 ├── README.md
 ├── lab1/
-│   ├── auth.log
-│   ├── access.log
 │   ├── analizar_ssh.py
 │   ├── analizar_web.py
 │   ├── visualizar.py
+│   ├── auth.log
+│   ├── access.log
 │   ├── reporte_ssh.json
 │   ├── reporte_web.json
 │   ├── graficas/
@@ -53,10 +125,10 @@ examen-practico-paredes/
 │       ├── SCR-2.3_regla_exfil.png
 │       └── alertas_wazuh.txt
 ├── lab3/
-│   ├── network_traffic.csv
 │   ├── deteccion_anomalias.ipynb
 │   ├── predecir.py
 │   ├── modelo_anomalias.pkl
+│   ├── network_traffic.csv
 │   ├── top10_anomalias.csv
 │   └── evidencias/
 │       ├── SCR-3.1_eda.png
@@ -68,6 +140,7 @@ examen-practico-paredes/
     ├── dashboard_soc.json
     ├── datasource_config.json
     ├── wazuh_alerts.db
+    ├── alerts.log
     └── evidencias/
         ├── herramienta_usada.txt
         ├── SCR-4.1_fuente_datos.png
@@ -78,184 +151,390 @@ examen-practico-paredes/
 
 ---
 
-## Lab 1 — Análisis Forense de Logs con Python
+## [1] Laboratorio 1 — Análisis Forense de Logs con Python (5 pts)
 
 ### Descripción
-Análisis de logs del sistema para detección de ataques SSH (brute force) y amenazas web (escaneo de directorios, SQL Injection).
+Se analizaron dos archivos de logs de un servidor de producción (`srv-prod-01`):
+- `auth.log` — Logs de autenticación SSH
+- `access.log` — Logs de acceso Apache HTTP
 
-### Archivos
-- `analizar_ssh.py` — Parsea `auth.log`, cuenta intentos fallidos por IP, genera ranking Top 10 y alerta si una IP supera 50 intentos. Exporta `reporte_ssh.json`.
-- `analizar_web.py` — Parsea `access.log`, detecta escaneo de directorios, errores 4xx/5xx por IP e intentos de SQL Injection. Exporta `reporte_web.json`.
-- `visualizar.py` — Genera 3 gráficas PNG: barras Top 10 SSH, línea de tiempo HTTP y heatmap por hora/código.
+### Tarea 1.1 — Parseo y estadísticas de auth.log
 
-### Instalación de dependencias
+El script `analizar_ssh.py` realiza:
+- Lectura del archivo `auth.log` con regex para detectar `Failed password`
+- Conteo de intentos fallidos por IP de origen
+- Ranking Top 10 de IPs más agresivas
+- Alerta en consola cuando una IP supera 50 intentos
+- Exportación a `reporte_ssh.json`
 
-```bash
-pip3 install matplotlib --break-system-packages
+**Resultados obtenidos:**
+
+```
+[+] Análisis SSH completado.
+    Total IPs atacantes : 35
+    Total intentos      : 253
+    Alertas (>=50)      : 2
+[+] Reporte guardado en: reporte_ssh.json
 ```
 
-### Pasos de reproducción
+**Como reproducir:**
 
 ```bash
 cd lab1/
 python3 analizar_ssh.py
-python3 analizar_web.py
-python3 visualizar.py
 ```
 
-### Resultados obtenidos
-- Total IPs atacantes SSH detectadas: ver `reporte_ssh.json`
-- Total IPs con escaneo web: ver `reporte_web.json`
-- Gráficas generadas en `graficas/`
+**Evidencia — Ejecución del script:**
+
+![SCR-1.4](lab1/evidencias/SCR-1.4_ejecucion_scripts.png)
 
 ---
 
-## Lab 2 — Reglas de Correlación en Wazuh
+### Tarea 1.2 — Análisis de access.log
 
-### Descripción
-Creación de reglas personalizadas en Wazuh para detección de ataques de fuerza bruta SSH y exfiltración de datos.
+El script `analizar_web.py` realiza:
+- Parseo del formato Combined Log Format de Apache con regex
+- Detección de escaneo de directorios (rutas sospechosas)
+- Agrupación de errores 4xx y 5xx por IP
+- Detección de SQL Injection (patrones: UNION, SELECT, --, ')
+- Exportación a `reporte_web.json`
 
-### Versión de Wazuh
+**Resultados obtenidos:**
 
-```bash
-/var/ossec/bin/wazuh-control info
+```
+[+] Análisis WEB completado.
+    IPs únicas          : 30
+    IPs con escaneo     : 22
+    IPs con SQLi        : 1
+[+] Reporte guardado en: reporte_web.json
 ```
 
-### Reglas creadas
+**Como reproducir:**
 
-**`local_rules_ssh.xml`**
-- Regla 100001 (nivel 5): captura intentos fallidos SSH
-- Regla 100002 (nivel 10): detecta 10+ fallos desde la misma IP en 60 segundos → Brute Force
+```bash
+python3 analizar_web.py
+```
 
-**`local_rules_exfil.xml`**
-- Regla 100010 (nivel 10): tráfico saliente excesivo >500MB
-- Regla 100011 (nivel 8): login exitoso fuera de horario laboral
-- Regla 100012 (nivel 14): correlación de ambas → Exfiltración de datos crítica
+---
 
-### Pasos de reproducción
+### Tarea 1.3 — Visualizaciones
+
+El script `visualizar.py` genera 3 gráficas usando matplotlib:
+
+**Como reproducir:**
+
+```bash
+python3 visualizar.py
+```
+
+**Gráfica 1 — Top 10 IPs con más intentos fallidos SSH:**
+
+![top10_ssh](lab1/graficas/top10_ssh.png)
+
+**Gráfica 2 — Línea de tiempo de peticiones HTTP por hora:**
+
+![timeline_http](lab1/graficas/timeline_http.png)
+
+**Gráfica 3 — Mapa de calor por hora y código de respuesta:**
+
+![heatmap_http](lab1/graficas/heatmap_http.png)
+
+---
+
+## [2] Laboratorio 2 — Reglas de Correlación en Wazuh (4 pts)
+
+### Descripción
+Se crearon reglas de correlación personalizadas en Wazuh para detectar:
+- Ataques de fuerza bruta SSH
+- Posible exfiltración de datos fuera de horario laboral
+
+### Tarea 2.1 — Regla: Brute Force SSH
+
+Archivo: `lab2/local_rules_ssh.xml`
+
+```xml
+<group name="ssh,brute_force,custom">
+  <rule id="100001" level="5">
+    <if_sid>5760</if_sid>
+    <description>Intento de autenticación SSH fallido</description>
+    <mitre><id>T1110</id></mitre>
+  </rule>
+  <rule id="100002" level="10" frequency="10" timeframe="60">
+    <if_matched_sid>100001</if_matched_sid>
+    <same_source_ip />
+    <description>ALERTA: Brute Force SSH - 10+ intentos en 60s desde la misma IP</description>
+    <group>authentication_failures,brute_force</group>
+    <mitre><id>T1110.001</id></mitre>
+  </rule>
+</group>
+```
+
+- Detecta 10 o más fallos SSH desde la misma IP en 60 segundos
+- Nivel de severidad: **10**
+- Grupos: `authentication_failures`, `brute_force`
+
+### Tarea 2.2 — Regla: Exfiltración de datos
+
+Archivo: `lab2/local_rules_exfil.xml`
+
+```xml
+<group name="data_exfiltration,custom">
+  <rule id="100010" level="10">
+    <if_sid>533</if_sid>
+    <description>Tráfico de red saliente excesivo (mayor a 500MB)</description>
+    <mitre><id>T1048</id></mitre>
+  </rule>
+  <rule id="100011" level="8">
+    <if_sid>5501</if_sid>
+    <time>6 pm - 8 am</time>
+    <description>Login exitoso fuera del horario laboral</description>
+    <mitre><id>T1078</id></mitre>
+  </rule>
+  <rule id="100012" level="14" frequency="2" timeframe="300">
+    <if_matched_sid>100010</if_matched_sid>
+    <if_matched_sid>100011</if_matched_sid>
+    <description>CRITICO: Posible exfiltración - Tráfico masivo + login fuera de horario</description>
+    <group>data_exfiltration,policy_violation</group>
+    <mitre><id>T1048.003</id></mitre>
+  </rule>
+</group>
+```
+
+- Nivel de severidad: **14 (crítico)**
+- Correlaciona login fuera de horario con transferencia masiva
+
+### Tarea 2.3 — Prueba y evidencia
+
+**Como reproducir:**
 
 ```bash
 # Copiar reglas a Wazuh
 sudo cp lab2/local_rules_ssh.xml /var/ossec/etc/rules/
 sudo cp lab2/local_rules_exfil.xml /var/ossec/etc/rules/
-
-# Reiniciar Wazuh
 sudo systemctl restart wazuh-manager
 
-# Simular ataque
+# Simular ataque de fuerza bruta
 cd lab2/
 python3 simular_ataque_ssh.py
 
-# Ver alertas generadas
+# Verificar alertas generadas
 sudo tail -100 /var/ossec/logs/alerts/alerts.log
 ```
 
-### Alertas generadas
-- Regla 100011 disparada: Login fuera de horario (nivel 8)
-- Regla 100012 disparada: Exfiltración crítica detectada (nivel 14)
+**Alertas generadas:**
+
+```
+Rule: 100011 (level 8)  -> 'Login exitoso fuera del horario laboral'
+Rule: 100012 (level 14) -> 'CRITICO: Posible exfiltración de datos'
+```
+
+**Evidencia — Alertas Wazuh:**
+
+![SCR-2.1](lab2/evidencias/SCR-2.1_alertas_wazuh.png)
 
 ---
 
-## Lab 3 — Detección de Anomalías con Machine Learning
+## [3] Laboratorio 3 — Modelo de Detección de Anomalías con ML (6 pts)
 
 ### Descripción
-Implementación de un modelo de Isolation Forest para detección de tráfico de red anómalo usando el dataset `network_traffic.csv` (10,000 registros).
+Se entrenó un modelo de Isolation Forest sobre el dataset `network_traffic.csv` con 10,000 registros de tráfico de red.
 
-### Dependencias
+### Tarea 3.1 — Exploración y Preprocesamiento
+
+- Dataset: 10,000 registros, 10 columnas, sin valores nulos
+- Distribución: ~9,500 normales / ~500 anomalías (5%)
+- Feature engineering aplicado:
+
+| Feature | Fórmula |
+|---|---|
+| `protocol_enc` | TCP=0, UDP=1, ICMP=2 |
+| `bytes_ratio` | bytes_sent / (bytes_recv + 1) |
+| `bytes_per_pkt` | bytes_sent / (packets + 1) |
+| `pkts_per_sec` | packets / (duration_sec + 1) |
+
+- Normalización con `StandardScaler`
+
+**Como reproducir:**
 
 ```bash
-pip3 install jupyter notebook pandas numpy scikit-learn matplotlib seaborn --break-system-packages
-```
-
-### Features utilizadas
-- `bytes_sent`, `bytes_recv`, `duration_sec`, `packets`
-- `protocol_enc` (TCP=0, UDP=1, ICMP=2)
-- `bytes_ratio` = bytes_sent / (bytes_recv + 1)
-- `bytes_per_pkt` = bytes_sent / (packets + 1)
-- `pkts_per_sec` = packets / (duration_sec + 1)
-- `dst_port`
-
-### Pasos de reproducción
-
-```bash
-# Abrir el notebook
 cd lab3/
 jupyter notebook deteccion_anomalias.ipynb
+# Ejecutar: Kernel > Restart & Run All
+```
 
-# O usar el script de predicción directamente
+**Evidencia — EDA e histogramas:**
+
+![SCR-3.1](lab3/evidencias/SCR-3.1_eda.png)
+
+### Tarea 3.2 — Entrenamiento del Modelo
+
+Modelo: `IsolationForest(contamination=0.05, n_estimators=100, random_state=42)`
+
+**Métricas obtenidas:**
+
+```
+========================================
+  MÉTRICAS DE EVALUACIÓN
+========================================
+  Precision : ver SCR-3.2
+  Recall    : ver SCR-3.2
+  F1-Score  : ver SCR-3.2
+========================================
+```
+
+**Evidencia — Métricas y matriz de confusión:**
+
+![SCR-3.2](lab3/evidencias/SCR-3.2_confusion.png)
+
+### Tarea 3.3 — Umbral Dinámico y Top Anomalías
+
+**Top 5 registros más anómalos detectados:**
+
+| IP Origen | IP Destino | Puerto | Bytes Enviados | Score |
+|---|---|---|---|---|
+| 10.0.3.174 | 185.220.101.45 | 443 | 4,553,566,747 | -0.3174 |
+| 10.0.3.75 | 143.109.217.176 | 8080 | 4,006,296,316 | -0.3106 |
+| 10.0.1.180 | 55.56.35.72 | 443 | 4,626,019,978 | -0.3086 |
+| 10.0.2.73 | 185.220.101.45 | 53 | 4,964,770,492 | -0.3080 |
+| 10.0.3.77 | 181.53.80.40 | 53 | 4,921,794,252 | -0.3070 |
+
+Estos registros representan amenazas reales porque presentan `bytes_sent` superiores a 4 GB en una sola conexión hacia IPs externas (incluyendo nodos TOR conocidos como `185.220.101.45`), lo que indica posible exfiltración masiva de datos.
+
+**Evidencia — Curva umbral vs F1:**
+
+![SCR-3.3](lab3/evidencias/SCR-3.3_umbral_f1.png)
+
+### Tarea 3.4 — Exportación y Predicción
+
+```bash
+# Modelo exportado
+lab3/modelo_anomalias.pkl
+
+# Uso del script de predicción
+cd lab3/
 python3 predecir.py network_traffic.csv
 ```
 
-### Resultados del modelo
-- Algoritmo: Isolation Forest (contamination=0.05, n_estimators=100)
-- Métricas: ver `evidencias/SCR-3.2_confusion.png`
-- Umbral óptimo F1: ver `evidencias/SCR-3.3_umbral_f1.png`
-- Modelo exportado: `modelo_anomalias.pkl`
-- Top 10 anomalías: `top10_anomalias.csv`
+**Resultados de predicción:**
+
+```
+==================================================
+  RESULTADOS DE CLASIFICACIÓN
+==================================================
+  Total registros : 10000
+  Normales        : 9505 (95.0%)
+  Anomalías       : 495  (5.0%)
+==================================================
+```
+
+**Evidencia — Script predecir.py en ejecución:**
+
+![SCR-3.4](lab3/evidencias/SCR-3.4_predecir.png)
 
 ---
 
-## Lab 4 — Dashboard de Monitoreo SOC
-
-### Descripción
-Dashboard de monitoreo SOC construido con Grafana, conectado a una base de datos SQLite con las alertas reales de Wazuh Manager.
+## [4] Laboratorio 4 — Dashboard de Monitoreo SOC (5 pts)
 
 ### Herramienta utilizada
-- **Grafana OSS**
-- URL: `http://localhost:3000`
-- Plugin: `frser-sqlite-datasource`
-- Fuente de datos: `/var/lib/grafana/wazuh_alerts.db`
 
-### Instalación de Grafana
+Se eligió **Grafana OSS** por su ligereza, flexibilidad y soporte nativo para SQLite mediante el plugin `frser-sqlite-datasource`, permitiendo visualizar directamente las alertas exportadas de Wazuh.
 
-```bash
-sudo apt install -y apt-transport-https software-properties-common
-wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
-echo "deb https://packages.grafana.com/oss/deb stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
-sudo apt update && sudo apt install -y grafana
-sudo systemctl enable grafana-server && sudo systemctl start grafana-server
-sudo grafana-cli plugins install frser-sqlite-datasource
-sudo systemctl restart grafana-server
+```
+Herramienta : Grafana OSS
+Versión     : latest
+URL         : http://localhost:3000
+Puerto      : 3000
+Datasource  : SQLite (frser-sqlite-datasource)
+Base datos  : /var/lib/grafana/wazuh_alerts.db
+Alertas     : 789 registros importados de Wazuh
 ```
 
-### Pasos de reproducción
+### Tarea 4.1 — Conexión a la fuente de datos
 
 ```bash
-# 1. Copiar el log de alertas de Wazuh
+# Parsear alertas de Wazuh a SQLite
 sudo cp /var/ossec/logs/alerts/alerts.log lab4/alerts.log
 sudo chown $USER:$USER lab4/alerts.log
-
-# 2. Parsear alertas a SQLite
 cd lab4/
 python3 parsear_alertas.py
 
-# 3. Mover la DB a la carpeta de Grafana
+# Copiar DB a directorio de Grafana
 sudo cp wazuh_alerts.db /var/lib/grafana/wazuh_alerts.db
 sudo chown grafana:grafana /var/lib/grafana/wazuh_alerts.db
-
-# 4. Abrir Grafana en http://localhost:3000
-# 5. Importar el dashboard desde dashboard_soc.json
 ```
 
-### Visualizaciones del Dashboard
-1. **Alertas por Nivel de Severidad** — Bar chart con niveles 3, 4, 7, 8, 14
-2. **Top 10 IPs Atacantes** — Table con fuente, total y nivel máximo
-3. **Línea de Alertas por Hora** — Time series con distribución horaria
-4. **Distribución por Tipo de Regla** — Pie chart con top 8 tipos de alerta
+**Resumen de alertas en la DB:**
 
-### Alerta configurada
-- Nombre: `Alerta - Nivel Critico Wazuh`
-- Condición: COUNT de alertas nivel >= 10 IS ABOVE 0
-- Grupo: SOC / SOC-Alertas
-- Intervalo de evaluación: 1 minuto
+| Nivel | Cantidad |
+|---|---|
+| 14 (Crítico) | 20 |
+| 8 | 7 |
+| 7 | 369 |
+| 4 | 1 |
+| 3 | 392 |
+
+**Evidencia — Fuente de datos conectada:**
+
+![SCR-4.1](lab4/evidencias/SCR-4.1_fuente_datos.png)
+
+### Tarea 4.2 — Visualizaciones
+
+Se crearon 4 visualizaciones en Grafana:
+
+| # | Tipo | Nombre | Query principal |
+|---|---|---|---|
+| V1 | Bar chart | Alertas por Nivel de Severidad | GROUP BY level |
+| V2 | Table | Top 10 IPs Atacantes | GROUP BY source ORDER BY Total DESC |
+| V3 | Time series | Línea de Alertas por Hora | GROUP BY hora |
+| V4 | Pie chart | Distribución por Tipo de Regla | GROUP BY description |
+
+**Evidencia — Visualizaciones:**
+
+![SCR-4.2](lab4/evidencias/SCR-4.2_visualizaciones.png)
+
+### Tarea 4.3 — Dashboard integrado
+
+Dashboard creado: **"SOC - Monitor de Seguridad"**
+- Integra las 4 visualizaciones
+- Filtro de tiempo global configurado
+- Exportado como `lab4/dashboard_soc.json`
+
+**Evidencia — Dashboard completo:**
+
+![SCR-4.3](lab4/evidencias/SCR-4.3_dashboard.png)
+
+### Tarea 4.4 — Alerta de umbral
+
+Alerta configurada en Grafana Alerting:
+
+```
+Nombre     : Alerta - Nivel Critico Wazuh
+Condición  : COUNT de alertas nivel >= 10 IS ABOVE 0
+Folder     : SOC
+Grupo      : SOC-Alertas
+Intervalo  : 1 minuto
+Estado     : Enabled
+```
+
+**Evidencia — Alerta configurada:**
+
+![SCR-4.4](lab4/evidencias/SCR-4.4_alerta.png)
 
 ---
 
-## Resumen de Entregables
+## Resumen de Resultados
 
-| Lab | Descripción | Estado |
-|---|---|---|
-| Lab 1 | Análisis forense SSH + Web + Visualizaciones | ✅ Completo |
-| Lab 2 | Reglas Wazuh Brute Force + Exfiltración | ✅ Completo |
-| Lab 3 | Isolation Forest + predecir.py | ✅ Completo |
-| Lab 4 | Dashboard SOC en Grafana | ✅ Completo |
+| Laboratorio | Descripción | Puntos | Estado |
+|---|---|---|---|
+| Lab 1 | Análisis Forense de Logs con Python | 5 pts | ✅ Completado |
+| Lab 2 | Reglas de Correlación en Wazuh | 4 pts | ✅ Completado |
+| Lab 3 | Modelo ML de Detección de Anomalías | 6 pts | ✅ Completado |
+| Lab 4 | Dashboard de Monitoreo SOC | 5 pts | ✅ Completado |
+| **Total** | | **20 pts** | ✅ **Completado** |
+
+---
+
+*Universidad Peruana Unión — UPEU*  
+*Facultad de Ingeniería y Arquitectura*  
+*Escuela Profesional de Ingeniería de Sistemas*  
+*Maykol Paredes — Ciclo IX — 2026*
