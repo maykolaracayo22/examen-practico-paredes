@@ -1,0 +1,8 @@
+Herramienta : Grafana
+Versión     : OSS (Open Source)
+URL         : http://localhost:3000
+IP          : 127.0.0.1
+Puerto      : 3000
+Datasource  : SQLite (plugin frser-sqlite-datasource)
+Base de datos: /var/lib/grafana/wazuh_alerts.db
+Datos fuente: Alertas de Wazuh Manager (/var/ossec/logs/alerts/alerts.log)
